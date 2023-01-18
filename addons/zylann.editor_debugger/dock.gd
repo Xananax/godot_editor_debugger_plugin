@@ -1,27 +1,27 @@
-tool
+@tool
 extends Control
 
-const Util = preload("util.gd")
+const Util := preload("util.gd")
 
 signal node_selected(node)
 
-onready var _popup_menu = get_node("PopupMenu")
-onready var _save_branch_as_scene_button = get_node("PopupMenu/SaveBranchAsSceneButton")
-onready var _inspection_checkbox = get_node("VBoxContainer/ShowInInspectorCheckbox")
-onready var _label = get_node("VBoxContainer/Label")
-onready var _tree_view = get_node("VBoxContainer/Tree")
-onready var _save_branch_file_dialog = get_node("SaveBranchFileDialog")
+@onready var _popup_menu := get_node("PopupMenu") as PopupMenu
+@onready var _save_branch_as_scene_button := get_node("PopupMenu/SaveBranchAsSceneButton") as Button
+@onready var _inspection_checkbox := get_node("VBoxContainer/ShowInInspectorCheckbox") as CheckBox
+@onready var _label := get_node("VBoxContainer/Label") as Label
+@onready var _tree_view := get_node("VBoxContainer/Tree") as Tree
+@onready var _save_branch_file_dialog := get_node("SaveBranchFileDialog") as FileDialog
 
-var _update_interval = 1.0
-var _time_before_next_update = 0.0
-var _control_highlighter = null
+var _update_interval := 1.0
+var _time_before_next_update := 0.0
+var _control_highlighter: ColorRect = null
 
 
-func get_tree_view():
+func get_tree_view() -> Tree:
 	return _tree_view
 
 
-func _enter_tree():
+func _enter_tree() -> void:
 	if Util.is_in_edited_scene(self):
 		return
 	_control_highlighter = ColorRect.new()
@@ -31,17 +31,17 @@ func _enter_tree():
 	get_viewport().call_deferred("add_child", _control_highlighter)
 
 
-func _exit_tree():
+func _exit_tree() -> void:
 	if _control_highlighter != null:
 		_control_highlighter.queue_free()
 
 
-func _process(delta):
+func _process(delta: float) -> void:
 	if Util.is_in_edited_scene(self):
 		set_process(false)
 		return
 		
-	var viewport = get_viewport()
+	var viewport := get_viewport()
 	_label.text = str(viewport.get_mouse_position())
 	
 	_time_before_next_update -= delta
@@ -50,38 +50,38 @@ func _process(delta):
 		_update_tree()
 
 
-func _update_tree():
-	var root = get_tree().get_root()
+func _update_tree() -> void:
+	var root := get_tree().root
 	if root == null:
 		_tree_view.clear()
 		return
 
 	#print("Updating tree")
 	
-	var root_view = _tree_view.get_root()
+	var root_view := _tree_view.get_root()
 	if root_view == null:
 		root_view = _create_node_view(root, null)
-	
+
 	_update_branch(root, root_view)
 
 
-func _update_branch(root, root_view):
-	if root_view.collapsed and root_view.get_children() != null:
+func _update_branch(root: Node, root_view: TreeItem) -> void:
+	if root_view.collapsed and root_view.get_child_count() != 0:
 		# Don't care about collapsed nodes.
 		# The editor is a big tree, don't waste cycles on things you can't see
 		return
 	
-	var children_views = _get_tree_item_children(root_view)
+	var children_views := root_view.get_children()
 	
 	for i in root.get_child_count():
-		var child = root.get_child(i)
+		var child := root.get_child(i)
 		var child_view
 		if i >= len(children_views):
 			child_view = _create_node_view(child, root_view)
 			children_views.append(child_view)
 		else:
 			child_view = children_views[i]
-			var child_view_name = child_view.get_metadata(0)
+			var child_view_name: String = child_view.get_metadata(0)
 			if child.name != child_view_name:
 				_update_node_view(child, child_view)
 		_update_branch(child, child_view)
@@ -91,39 +91,26 @@ func _update_branch(root, root_view):
 			children_views[i].free()
 
 
-func _create_node_view(node, parent_view):
+func _create_node_view(node: Node, parent_view: TreeItem) -> TreeItem:
 	#print("Create view for ", node)
 	assert(node is Node)
 	assert(parent_view == null or parent_view is TreeItem)
-	var view = _tree_view.create_item(parent_view)
+	var view := _tree_view.create_item(parent_view)
 	view.collapsed = true
 	_update_node_view(node, view)
 	return view
 
 
-func _update_node_view(node, view):
+func _update_node_view(node: Node, view: TreeItem) -> void:
 	assert(node is Node)
 	assert(view is TreeItem)
 	view.set_text(0, str(node.get_class(), ": ", node.name))
 	view.set_metadata(0, node.name)
 
-			
-static func _get_tree_item_children(item):
-	var children = []
-	var child = item.get_children()
-	if child == null:
-		return children
-	children.append(child)
-	child = child.get_next()
-	while child != null:
-		children.append(child)
-		child = child.get_next()
-	return children
 
-
-func _select_node():
-	var node_view = _tree_view.get_selected()
-	var node = _get_node_from_view(node_view)
+func _select_node() -> void:
+	var node_view := _tree_view.get_selected()
+	var node := _get_node_from_view(node_view)
 	
 	print("Selected ", node)
 	
@@ -132,35 +119,31 @@ func _select_node():
 	emit_signal("node_selected", node)
 
 
-func _on_Tree_item_selected():
+func _on_Tree_item_selected() -> void:
 	_select_node()
+	if Input.is_key_pressed(KEY_ALT):
+		_popup_menu.popup()
+		_popup_menu.set_position(get_viewport().get_mouse_position())
 
 
-func _on_Tree_item_rmb_selected(position):
-	_select_node()
-	_popup_menu.popup()
-	_popup_menu.set_position(get_viewport().get_mouse_position())
 
-
-func _highlight_node(node):
-	if node == null:
-		_control_highlighter.hide()
-	elif node is Control:
-		var r = node.get_global_rect()
-		_control_highlighter.rect_position = r.position
-		_control_highlighter.rect_size = r.size
+func _highlight_node(node: Node) -> void:
+	if node is Control:
+		var target_control := (node as Control)
+		_control_highlighter.global_position = target_control.global_position
+		_control_highlighter.size = target_control.size
 		_control_highlighter.show()
 	else:
 		_control_highlighter.hide()
 
 
-func _get_node_from_view(node_view):
+func _get_node_from_view(node_view: TreeItem) -> Node:
 	if node_view.get_parent() == null:
-		return get_tree().get_root()
+		return get_tree().root
 	
 	# Reconstruct path
-	var path = node_view.get_metadata(0)
-	var parent_view = node_view
+	var path: String = node_view.get_metadata(0)
+	var parent_view := node_view
 	while parent_view.get_parent() != null:
 		parent_view = parent_view.get_parent()
 		# Exclude root
@@ -168,28 +151,28 @@ func _get_node_from_view(node_view):
 			break
 		path = str(parent_view.get_metadata(0), "/", path)
 	
-	var node = get_tree().get_root().get_node(path)
+	var node := get_tree().root.get_node(path)
 	return node
 
 
-func _focus_in_tree(node):
+func _focus_in_tree(node: Node) -> void:
 	_update_tree()
 	
-	var parent = get_tree().get_root()
-	var path = node.get_path()
-	var parent_view = _tree_view.get_root()
+	var parent: Node = get_tree().root
+	var path := node.get_path()
+	var parent_view := _tree_view.get_root()
 	
-	var node_view = null
+	var node_view: TreeItem = null
 	
 	for i in range(1, path.get_name_count()):
-		var part = path.get_name(i)
+		var part := path.get_name(i)
 		print(part)
 		
-		var child_view = parent_view.get_children()
+		var child_view := parent_view.get_child(0)
 		if child_view == null:
 			_update_branch(parent, parent_view)
 		
-		child_view = parent_view.get_children()
+		child_view = parent_view.get_child(0)
 		
 		while child_view != null and child_view.get_metadata(0) != part:
 			child_view = child_view.get_next()
@@ -199,7 +182,7 @@ func _focus_in_tree(node):
 			break
 		
 		node_view = child_view
-		parent = parent.get_node(part)
+		parent = parent.get_node(String(part))
 		parent_view = child_view
 	
 	if node_view != null:
@@ -208,36 +191,36 @@ func _focus_in_tree(node):
 		_tree_view.ensure_cursor_is_visible()
 
 
-static func _uncollapse_to_root(node_view):
-	var parent_view = node_view.get_parent()
+static func _uncollapse_to_root(node_view: TreeItem) -> void:
+	var parent_view := node_view.get_parent()
 	while parent_view != null:
 		parent_view.collapsed = false
 		parent_view = parent_view.get_parent()
 
 
-static func _get_index_path(node):
-	var ipath = []
+static func _get_index_path(node: Node) -> Array[int]:
+	var ipath: Array[int] = []
 	while node.get_parent() != null:
 		ipath.append(node.get_index())
 		node = node.get_parent()
-	ipath.invert()
+	ipath.reverse()
 	return ipath
 
 
-func _on_Tree_nothing_selected():
+func _on_Tree_nothing_selected() -> void:
 	_control_highlighter.hide()
 
 
-func _input(event):
+func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		if event.pressed:
-			if event.scancode == KEY_F12:
+			if event.keycode == KEY_F12:
 				pick(get_viewport().get_mouse_position())
 
 
-func pick(mpos):
-	var root = get_tree().get_root()
-	var node = _pick(root, mpos)
+func pick(mpos: Vector2) -> void:
+	var root := get_tree().root
+	var node := _pick(root, mpos)
 	if node != null:
 		print("Picked ", node, " at ", node.get_path())
 		_focus_in_tree(node)
@@ -245,22 +228,22 @@ func pick(mpos):
 		_highlight_node(null)
 
 
-func is_inspection_enabled():
-	return _inspection_checkbox.pressed
+func is_inspection_enabled() -> bool:
+	return _inspection_checkbox.button_pressed
 
 
-func _pick(root, mpos, level = 0):
+func _pick(root: Node, mpos: Vector2, level = 0) -> Node:
 	
-#	var s = ""
+#	var s := ""
 #	for i in level:
 #		s = str(s, "  ")
 #
 #	print(s, "Looking at ", root, ": ", root.name)
 	
-	var node = null
+	var node: Node = null
 	
 	for i in root.get_child_count():
-		var child = root.get_child(i)
+		var child := root.get_child(i)
 		
 		if (child is CanvasItem and not child.visible):
 			#print(s, child, " is invisible or viewport")
@@ -271,25 +254,29 @@ func _pick(root, mpos, level = 0):
 			continue
 		
 		if child is Control and child.get_global_rect().has_point(mpos):
-			var c = _pick(child, mpos, level + 1)
+			var c := _pick(child, mpos, level + 1)
 			if c != null:
 				return c
 			else:
 				node = child
 		else:
-			var c = _pick(child, mpos, level + 1)
+			var c := _pick(child, mpos, level + 1)
 			if c != null:
 				return c
 	
 	return node
 
-
-static func override_ownership(root, owners):
+# @param root
+# @param {Dictionary[Node, Node]} owners
+static func override_ownership(root: Node, owners: Dictionary) -> void:
 	assert(root is Node)
 	_override_ownership_recursive(root, root, owners)
 
 
-static func _override_ownership_recursive(root, node, owners):
+# @param root
+# @param node
+# @param {Dictionary[Node, Node]} owners
+static func _override_ownership_recursive(root: Node, node: Node, owners: Dictionary) -> void:
 	# Make root own all children of node.
 	for child in node.get_children():
 		if child.owner != null:
@@ -298,7 +285,9 @@ static func _override_ownership_recursive(root, node, owners):
 		_override_ownership_recursive(root, child, owners)
 
 
-static func restore_ownership(root, owners):
+# @param root
+# @param {Dictionary[Node, Node]} owners
+static func restore_ownership(root: Node, owners: Dictionary) -> void:
 	assert(root is Node)
 	# Remove all of root's children's owners.
 	# Also restore node ownership to nodes which had their owner overridden.
@@ -311,25 +300,25 @@ static func restore_ownership(root, owners):
 		restore_ownership(child, owners)
 
 
-func _on_ShowInInspectorCheckbox_toggled(button_pressed):
+func _on_ShowInInspectorCheckbox_toggled(_button_pressed: bool) -> void:
 	pass
 
 
-func _on_SaveBranchAsSceneButton_pressed():
+func _on_SaveBranchAsSceneButton_pressed() -> void:
 	#_save_branch_as_scene_button.accept_event()
 	_popup_menu.hide()
 	_save_branch_file_dialog.popup_centered_ratio()
 
 
-func _on_SaveBranchFileDialog_file_selected(path):
-	var node_view = _tree_view.get_selected()
-	var node = _get_node_from_view(node_view)
+func _on_SaveBranchFileDialog_file_selected(path: String) -> void:
+	var node_view := _tree_view.get_selected()
+	var node := _get_node_from_view(node_view)
 	# Make the selected node own all it's children.
-	var owners = {}
+	var owners := {}
 	override_ownership(node, owners)
 	# Pack the selected node and it's children into a scene then save it.
-	var packed_scene = PackedScene.new()
+	var packed_scene := PackedScene.new()
 	packed_scene.pack(node)
-	ResourceSaver.save(path, packed_scene)
+	ResourceSaver.save(packed_scene, path)
 	# Revert ownership of all children.
 	restore_ownership(node, owners)

@@ -6,12 +6,21 @@
 ;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
-config_version=3
+config_version=5
 
 [application]
 
 config/name="Editor Debugger"
+config/features=PackedStringArray("4.0")
 config/icon="res://icon.png"
+
+[editor]
+
+export/convert_text_resources_to_binary=true
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/zylann.editor_debugger/plugin.cfg")
 
 [rendering]
 
